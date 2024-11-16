@@ -7,12 +7,6 @@
 #include "DHTesp.h"
 #include <Ticker.h>
 
-#ifndef ESP32
-#pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
-#error Select ESP32 board.
-#endif
-
-
 #define SOUND_SPEED 0.034
 #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP 10       /* Time ESP32 will go to sleep (in seconds) */
@@ -31,7 +25,31 @@ float distanceCm1;
 long duration2;
 float distanceCm2;
 
+int tiltpin = 22;
+int tiltState = 0;
+bool tiltStateJson = false;
+
 DHTesp dht;
+String sensorData;
+
+#define WIFI_SSID "KdG-iDev"
+#define WIFI_PASSWORD "fquG9iCnQ4aa3Kca"
+
+#define HOME_WIFI "Proximus-Home-E978"
+#define HOME_PASSWD "wafa4667a559z"
+
+#define LTE "Y"
+#define LTEPW "Zenbook13"
+
+// MQTT Setup
+const char *mqtt_broker = "broker.emqx.io";
+const char *topic = "emqx/esp32";
+const char *mqtt_username = "admin";
+const char *mqtt_password = "initial01";
+const int mqtt_port = 8883;
+
+String serverName = "http://10.134.178.158:8080/testdata";
+String localHostName = "http://localhost:8080/h2-console/login.do";
 
 void tempTask(void *pvParameters);
 bool getTemperature();
@@ -48,26 +66,30 @@ bool tasksEnabled = false;
 /** Pin number for DHT11 data pin */
 int dhtPin = 15;
 
-bool initTemp() {
+bool initTemp()
+{
   byte resultValue = 0;
   // Initialize temperature sensor
-	dht.setup(dhtPin, DHTesp::DHT11);
-	Serial.println("DHT initiated");
+  dht.setup(dhtPin, DHTesp::DHT11);
+  Serial.println("DHT initiated");
 
   // Start task to get temperature
-	xTaskCreatePinnedToCore(
-			tempTask,                       /* Function to implement the task */
-			"tempTask ",                    /* Name of the task */
-			4000,                           /* Stack size in words */
-			NULL,                           /* Task input parameter */
-			5,                              /* Priority of the task */
-			&tempTaskHandle,                /* Task handle. */
-			1);                             /* Core where the task should run */
+  xTaskCreatePinnedToCore(
+      tempTask,        /* Function to implement the task */
+      "tempTask ",     /* Name of the task */
+      4000,            /* Stack size in words */
+      NULL,            /* Task input parameter */
+      5,               /* Priority of the task */
+      &tempTaskHandle, /* Task handle. */
+      1);              /* Core where the task should run */
 
-  if (tempTaskHandle == NULL) {
+  if (tempTaskHandle == NULL)
+  {
     Serial.println("Failed to start task for temperature update");
     return false;
-  } else {
+  }
+  else
+  {
     // Start update of environment data every 20 seconds
     tempTicker.attach(20, triggerGetTemp);
   }
@@ -79,9 +101,11 @@ bool initTemp() {
  * Sets flag dhtUpdated to true for handling in loop()
  * called by Ticker getTempTimer
  */
-void triggerGetTemp() {
-  if (tempTaskHandle != NULL) {
-	   xTaskResumeFromISR(tempTaskHandle);
+void triggerGetTemp()
+{
+  if (tempTaskHandle != NULL)
+  {
+    xTaskResumeFromISR(tempTaskHandle);
   }
 }
 
@@ -90,17 +114,19 @@ void triggerGetTemp() {
  * @param pvParameters
  *    pointer to task parameters
  */
-void tempTask(void *pvParameters) {
-	Serial.println("tempTask loop started");
-	while (1) // tempTask loop
+void tempTask(void *pvParameters)
+{
+  Serial.println("tempTask loop started");
+  while (1) // tempTask loop
   {
-    if (tasksEnabled) {
+    if (tasksEnabled)
+    {
       // Get temperature values
-			getTemperature();
-		}
+      getTemperature();
+    }
     // Got sleep again
-		vTaskSuspend(NULL);
-	}
+    vTaskSuspend(NULL);
+  }
 }
 
 /**
@@ -109,75 +135,68 @@ void tempTask(void *pvParameters) {
  * @return bool
  *    true if temperature could be aquired
  *    false if aquisition failed
-*/
-bool getTemperature() {
-	// Reading temperature for humidity takes about 250 milliseconds!
-	// Sensor readings may also be up to 2 seconds 'old' (it's a very slow sensor)
+ */
+String getDHTSensorData(DHTesp &dht)
+{
+  // Reading temperature for humidity takes about 250 milliseconds!
+  // Sensor readings may also be up to 2 seconds 'old' (it's a very slow sensor)
   TempAndHumidity newValues = dht.getTempAndHumidity();
-	// Check if any reads failed and exit early (to try again).
-	if (dht.getStatus() != 0) {
-		Serial.println("DHT11 error status: " + String(dht.getStatusString()));
-		return false;
-	}
+  // Check if any reads failed and exit early (to try again).
+  if (dht.getStatus() != 0)
+  {
+    return "DHT11 error status: " + String(dht.getStatusString());
+  }
 
-	float heatIndex = dht.computeHeatIndex(newValues.temperature, newValues.humidity);
+  ComfortState cf;
+  float heatIndex = dht.computeHeatIndex(newValues.temperature, newValues.humidity);
   float dewPoint = dht.computeDewPoint(newValues.temperature, newValues.humidity);
-  float cr = dht.getComfortRatio(cf, newValues.temperature, newValues.humidity);
+  dht.getComfortRatio(cf, newValues.temperature, newValues.humidity);
 
   String comfortStatus;
-  switch(cf) {
-    case Comfort_OK:
-      comfortStatus = "Comfort_OK";
-      break;
-    case Comfort_TooHot:
-      comfortStatus = "Comfort_TooHot";
-      break;
-    case Comfort_TooCold:
-      comfortStatus = "Comfort_TooCold";
-      break;
-    case Comfort_TooDry:
-      comfortStatus = "Comfort_TooDry";
-      break;
-    case Comfort_TooHumid:
-      comfortStatus = "Comfort_TooHumid";
-      break;
-    case Comfort_HotAndHumid:
-      comfortStatus = "Comfort_HotAndHumid";
-      break;
-    case Comfort_HotAndDry:
-      comfortStatus = "Comfort_HotAndDry";
-      break;
-    case Comfort_ColdAndHumid:
-      comfortStatus = "Comfort_ColdAndHumid";
-      break;
-    case Comfort_ColdAndDry:
-      comfortStatus = "Comfort_ColdAndDry";
-      break;
-    default:
-      comfortStatus = "Unknown:";
-      break;
+  switch (cf)
+  {
+  case Comfort_OK:
+    comfortStatus = "Comfort_OK";
+    break;
+  case Comfort_TooHot:
+    comfortStatus = "Comfort_TooHot";
+    break;
+  case Comfort_TooCold:
+    comfortStatus = "Comfort_TooCold";
+    break;
+  case Comfort_TooDry:
+    comfortStatus = "Comfort_TooDry";
+    break;
+  case Comfort_TooHumid:
+    comfortStatus = "Comfort_TooHumid";
+    break;
+  case Comfort_HotAndHumid:
+    comfortStatus = "Comfort_HotAndHumid";
+    break;
+  case Comfort_HotAndDry:
+    comfortStatus = "Comfort_HotAndDry";
+    break;
+  case Comfort_ColdAndHumid:
+    comfortStatus = "Comfort_ColdAndHumid";
+    break;
+  case Comfort_ColdAndDry:
+    comfortStatus = "Comfort_ColdAndDry";
+    break;
+  default:
+    comfortStatus = "Unknown:";
+    break;
   };
 
-  Serial.println(" T:" + String(newValues.temperature) + " H:" + String(newValues.humidity) + " I:" + String(heatIndex) + " D:" + String(dewPoint) + " " + comfortStatus);
-	return true;
+  return "T:" + String(newValues.temperature, 2) +
+         " H:" + String(newValues.humidity, 2) +
+         " " + comfortStatus;
 }
 
-#define WIFI_SSID "KdG-iDev"
-#define WIFI_PASSWORD "fquG9iCnQ4aa3Kca"
-
-#define HOME_WIFI "Proximus-Home-E978"
-#define HOME_PASSWD "wafa4667a559z"
-
-// MQTT Setup
-const char *mqtt_broker = "broker.emqx.io";
-const char *topic = "emqx/esp32";
-const char *mqtt_username = "admin";
-const char *mqtt_password = "initial01";
-const int mqtt_port = 8883;
-
-String serverName = "http://10.134.178.158:8080/testdata";
-String localHostName = "http://localhost:8080/h2-console/login.do";
-
+bool getTemperature()
+{
+  Serial.println(getDHTSensorData(dht)); // Or use the result as needed.
+  return true;
+}
 
 void print_wakeup_reason()
 {
@@ -235,7 +254,7 @@ void sendSensorDataToServer()
   if (WiFi.status() != WL_CONNECTED)
   {
     Serial.println("WiFi not connected. Trying to reconnect...");
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(LTE, LTEPW);
     while (WiFi.status() != WL_CONNECTED)
     {
       delay(1000);
@@ -243,6 +262,22 @@ void sendSensorDataToServer()
     }
     Serial.println("Reconnected to WiFi.");
   }
+
+  String tempData = getDHTSensorData(dht);
+
+  StaticJsonDocument<200> TempJson;
+
+  int temperatureIndex = tempData.indexOf("T:") + 2;
+  int humidityIndex = tempData.indexOf("H:") + 2;
+  int comfortIndex = tempData.indexOf(" ") + 1;
+
+  String temperature = tempData.substring(temperatureIndex, tempData.indexOf(" ", temperatureIndex));
+  String humidity = tempData.substring(humidityIndex, tempData.indexOf(" ", humidityIndex));
+  String comfortStatus = tempData.substring(comfortIndex);
+
+  TempJson["temperature"] = temperature;
+  TempJson["humidity"] = humidity;
+  TempJson["comfortStatus"] = comfortStatus;
 
   HTTPClient http;
   String serverName = "http://172.20.10.10/data";
@@ -255,6 +290,8 @@ void sendSensorDataToServer()
   StaticJsonDocument<200> doc;
   doc["sensorDistance1"] = distanceCm1;
   doc["sensorDistance2"] = distanceCm2;
+  doc["tiltState"] = tiltStateJson;
+  doc["temperature"] = TempJson;
   String requestData;
   serializeJson(doc, requestData);
 
@@ -276,7 +313,6 @@ void sendSensorDataToServer()
     Serial.print("Error on sending POST: ");
     Serial.println(httpResponseCode);
   }
-
   http.end();
 }
 
@@ -287,6 +323,7 @@ void setup()
   pinMode(trigPin2, OUTPUT);
   pinMode(echoPin1, INPUT);
   pinMode(echoPin2, INPUT);
+  pinMode(tiltpin, INPUT);
 
   bootCount++;
   Serial.println("Boot number: " + String(bootCount));
@@ -305,32 +342,33 @@ void setup()
   initTemp();
   // Signal end of setup() to tasks
   tasksEnabled = true;
-
+  dht.setup(DHTPIN, DHTesp::DHT11);
 }
 
 void loop()
 {
-  delay(500);
-  measureDistances();
 
+  tiltState = digitalRead(tiltpin);
+
+  if (tiltState == HIGH)
+  {
+    Serial.println("Tilted");
+    tiltStateJson = true;
+  }
+  else
+  {
+    Serial.println("Not Tilted");
+    tiltStateJson = false;
+  }
+
+  measureDistances();
   // if (WiFi.status() == WL_CONNECTED)
   // {
-  //   sendSensorDataToServer();
+  sendSensorDataToServer();
   // }
-  delay(500);
-  if (!tasksEnabled) {
-    // Wait 2 seconds to let system settle down
-    delay(2000);
-    // Enable task that will read values from the DHT sensor
-    tasksEnabled = true;
-    if (tempTaskHandle != NULL) {
-			vTaskResume(tempTaskHandle);
-		}
-  }
-  yield();
-  Serial.println("\n");
+  sensorData = getDHTSensorData(dht);
+
+  Serial.print(sensorData);
   Serial.print("\n");
-  Serial.print(temperatureRead());\
-  Serial.print("\n");
-  Serial.println(getTemperature());
+  delay(2000);
 }

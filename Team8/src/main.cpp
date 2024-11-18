@@ -7,11 +7,18 @@
 #include "DHTesp.h"
 #include <Ticker.h>
 
+// Constants
+
 #define SOUND_SPEED 0.034
 #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP 10       /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP 10 /* Time ESP32 will go to sleep (in seconds) */
 #define DHTPIN 15
 #define DHTTYPE DHT11
+
+// KdG Wifi credentials
+#define WIFI_SSID "KdG-iDev"
+#define WIFI_PASSWORD "fquG9iCnQ4aa3Kca"
+
 RTC_DATA_ATTR int bootCount = 0;
 
 const int trigPin1 = 5;
@@ -29,17 +36,14 @@ int tiltpin = 22;
 int tiltState = 0;
 bool tiltStateJson = false;
 
+const int irSensorPin = 4;
+
 DHTesp dht;
 String sensorData;
 
-#define WIFI_SSID "KdG-iDev"
-#define WIFI_PASSWORD "fquG9iCnQ4aa3Kca"
 
 #define HOME_WIFI "Proximus-Home-E978"
 #define HOME_PASSWD "wafa4667a559z"
-
-#define LTE "Y"
-#define LTEPW "Zenbook13"
 
 // MQTT Setup
 const char *mqtt_broker = "broker.emqx.io";
@@ -152,44 +156,8 @@ String getDHTSensorData(DHTesp &dht)
   float dewPoint = dht.computeDewPoint(newValues.temperature, newValues.humidity);
   dht.getComfortRatio(cf, newValues.temperature, newValues.humidity);
 
-  String comfortStatus;
-  switch (cf)
-  {
-  case Comfort_OK:
-    comfortStatus = "Comfort_OK";
-    break;
-  case Comfort_TooHot:
-    comfortStatus = "Comfort_TooHot";
-    break;
-  case Comfort_TooCold:
-    comfortStatus = "Comfort_TooCold";
-    break;
-  case Comfort_TooDry:
-    comfortStatus = "Comfort_TooDry";
-    break;
-  case Comfort_TooHumid:
-    comfortStatus = "Comfort_TooHumid";
-    break;
-  case Comfort_HotAndHumid:
-    comfortStatus = "Comfort_HotAndHumid";
-    break;
-  case Comfort_HotAndDry:
-    comfortStatus = "Comfort_HotAndDry";
-    break;
-  case Comfort_ColdAndHumid:
-    comfortStatus = "Comfort_ColdAndHumid";
-    break;
-  case Comfort_ColdAndDry:
-    comfortStatus = "Comfort_ColdAndDry";
-    break;
-  default:
-    comfortStatus = "Unknown:";
-    break;
-  };
-
   return "T:" + String(newValues.temperature, 2) +
-         " H:" + String(newValues.humidity, 2) +
-         " " + comfortStatus;
+         " H:" + String(newValues.humidity, 2);
 }
 
 bool getTemperature()
@@ -368,6 +336,7 @@ void setup()
   pinMode(echoPin1, INPUT);
   pinMode(echoPin2, INPUT);
   pinMode(tiltpin, INPUT);
+  pinMode(irSensorPin, INPUT);
 
   dht.setup(DHTPIN, DHTesp::DHT11);
 
@@ -379,13 +348,13 @@ void setup()
   bootCount++;
   Serial.println("Boot number: " + String(bootCount));
 
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_22, 1);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, 1);
 
-  if (digitalRead(tiltpin) == HIGH)
+  if (digitalRead(GPIO_NUM_4) == HIGH)
   {
     Serial.println("Tilt detected. Measuring and sending data...");
     measureDistances();
-    sendSensorDataToServer();
+    // sendSensorDataToServer();
     String dhtData = getDHTSensorData(dht);
     Serial.println(dhtData);
   }
@@ -400,47 +369,51 @@ void setup()
 
   Serial.println("Entering deep sleep...");
   delay(100);
-  esp_deep_sleep_start();
+  // esp_deep_sleep_start();
 
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println("WiFi Connected!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-  }
-  else
-  {
-    Serial.println("WiFi Connection Failed.");
-    while (WiFi.status() != WL_CONNECTED)
-    {
-      delay(1000);
-      Serial.println("Attempting to reconnect...");
-      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    }
-  }
+  // if (WiFi.status() == WL_CONNECTED)
+  // {
+  //   Serial.println("WiFi Connected!");
+  //   Serial.print("IP Address: ");
+  //   Serial.println(WiFi.localIP());
+  // }
+  // else
+  // {
+  //   Serial.println("WiFi Connection Failed.");
+  //   while (WiFi.status() != WL_CONNECTED)
+  //   {
+  //     delay(1000);
+  //     Serial.println("Attempting to reconnect...");
+  //     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  //   }
+  // }
 }
 
 void loop()
 {
 
-  tiltState = digitalRead(tiltpin);
-
-  if (tiltState == HIGH)
-  {
-    Serial.println("Tilted");
-    tiltStateJson = true;
-    sendSensorDataToServer();
-  }
-  else
-  {
-    Serial.println("Not Tilted");
-    tiltStateJson = false;
-  }
+  // tiltState = digitalRead(tiltpin);
+  // if (tiltState == HIGH)
+  // {
+  //   Serial.println("Tilted");
+  //   tiltStateJson = true;
+  //   // sendSensorDataToServer();
+  // }
+  // else
+  // {
+  //   Serial.println("Not Tilted");
+  //   tiltStateJson = false;
+  // }
 
   sensorData = getDHTSensorData(dht);
 
   Serial.print(sensorData);
-  Serial.print("\n");
-  delay(2000);
+  // Serial.print("\n");
   // testGetRequest();
+  int sensorState = digitalRead(irSensorPin);
+  if (sensorState == LOW)
+  {
+    Serial.println("Obstacle detected!");
+  }
+  delay(2000);
 }

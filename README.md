@@ -25,14 +25,32 @@ This project involves using an ESP32 microcontroller to monitor bin information 
 
 ### Prerequisites
 
-
 ### Setup
 
 ## Hardware Specifications
-- **Microcontroller:** ESP32
 
+ **Microcontroller:** ESP32
+- **Sensors:**
+  - **DHT11 Sensor:**
+    - Temperature Measurement
+    - Data Pin: GPIO 15
+  - **Ultrasonic Sensors:**
+    - Distance Measurement
+    - Sensor 1:
+      - Trig Pin: GPIO 5
+      - Echo Pin: GPIO 18
+    - Sensor 2:
+      - Trig Pin: GPIO 19
+      - Echo Pin: GPIO 21
 ## Libraries Used
-
+ - [Arduino]
+ - [PubSubClient]
+ - [WiFi]
+ - [HTTPClient]
+ - [ArduinoJson]
+ - [WifiManager]
+ - [DHTesp]
+ - [Ticker]
 ## Notes
 
 ## Troubleshooting

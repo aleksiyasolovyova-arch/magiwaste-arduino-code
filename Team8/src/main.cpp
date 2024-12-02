@@ -200,6 +200,19 @@
     return jsonOutput;
   }
 
+
+  void connect(){
+    if (WiFi.status() != WL_CONNECTED){
+      Serial.println("WiFi not connected. Trying to reconnect...");
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+      while (WiFi.status() != WL_CONNECTED){
+        delay(1000);
+        Serial.println("Reconnecting...");
+      }
+      Serial.println("Reconnected to WiFi.");
+    }
+  }
+
   void sendDataHTTP(){
     connect();
     String comfortStatus;
@@ -267,17 +280,6 @@
 
   }
 
-  void connect(){
-    if (WiFi.status() != WL_CONNECTED){
-      Serial.println("WiFi not connected. Trying to reconnect...");
-      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-      while (WiFi.status() != WL_CONNECTED){
-        delay(1000);
-        Serial.println("Reconnecting...");
-      }
-      Serial.println("Reconnected to WiFi.");
-    }
-  }
 
   void setup(){
     Serial.begin(115200);
@@ -339,6 +341,7 @@
     if (tiltState == HIGH)
     {
       tilted = true;
+      
       sendDataHTTP();
     }
 

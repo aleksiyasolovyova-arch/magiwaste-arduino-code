@@ -15,8 +15,8 @@
 #define DHTTYPE DHT11
 
 // KdG Wifi credentials
-#define WIFI_SSID "KdG-iDev"
-#define WIFI_PASSWORD "fquG9iCnQ4aa3Kca"
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASSWORD;
 
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);

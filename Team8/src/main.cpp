@@ -8,7 +8,6 @@
 #include <ArduinoMqttClient.h>
 
 // Constants
-
 #define SOUND_SPEED 0.034
 #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP 10       /* Time ESP32 will go to sleep (in seconds) */
@@ -194,8 +193,7 @@ void print_wakeup_reason()
   }
 }
 
-void measureDistances()
-{
+void measureDistances(){
   digitalWrite(trigPin1, LOW);
   delayMicroseconds(20);
   digitalWrite(trigPin1, HIGH);
@@ -219,21 +217,17 @@ void measureDistances()
   Serial.println(sensorDistance2);
 }
 
-String debugJsonDoc(const JsonDocument &doc)
-{
+String debugJsonDoc(const JsonDocument &doc){
   String jsonOutput;
   serializeJson(doc, jsonOutput);
   return jsonOutput;
 }
 
-void connect()
-{
-  if (WiFi.status() != WL_CONNECTED)
-  {
+void connect(){
+  if (WiFi.status() != WL_CONNECTED){
     Serial.println("WiFi not connected. Trying to reconnect...");
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED)
-    {
+    while (WiFi.status() != WL_CONNECTED){
       delay(1000);
       Serial.println("Reconnecting...");
     }
@@ -241,42 +235,20 @@ void connect()
   }
 }
 
-void sendData(String protocol)
-{
+void sendData(String protocol){
   connect();
   String comfortStatus;
-  switch (cf)
-  {
-  case Comfort_OK:
-    comfortStatus = "Comfort_OK";
-    break;
-  case Comfort_TooHot:
-    comfortStatus = "Comfort_TooHot";
-    break;
-  case Comfort_TooCold:
-    comfortStatus = "Comfort_TooCold";
-    break;
-  case Comfort_TooDry:
-    comfortStatus = "Comfort_TooDry";
-    break;
-  case Comfort_TooHumid:
-    comfortStatus = "Comfort_TooHumid";
-    break;
-  case Comfort_HotAndHumid:
-    comfortStatus = "Comfort_HotAndHumid";
-    break;
-  case Comfort_HotAndDry:
-    comfortStatus = "Comfort_HotAndDry";
-    break;
-  case Comfort_ColdAndHumid:
-    comfortStatus = "Comfort_ColdAndHumid";
-    break;
-  case Comfort_ColdAndDry:
-    comfortStatus = "Comfort_ColdAndDry";
-    break;
-  default:
-    comfortStatus = "Unknown:";
-    break;
+  switch (cf){
+  case Comfort_OK:comfortStatus = "Comfort_OK";break;
+  case Comfort_TooHot:comfortStatus = "Comfort_TooHot";break;
+  case Comfort_TooCold:comfortStatus = "Comfort_TooCold";break;
+  case Comfort_TooDry:comfortStatus = "Comfort_TooDry";break;
+  case Comfort_TooHumid:comfortStatus = "Comfort_TooHumid";break;
+  case Comfort_HotAndHumid:comfortStatus = "Comfort_HotAndHumid";break;
+  case Comfort_HotAndDry:comfortStatus = "Comfort_HotAndDry";break;
+  case Comfort_ColdAndHumid:comfortStatus = "Comfort_ColdAndHumid";break;
+  case Comfort_ColdAndDry:comfortStatus = "Comfort_ColdAndDry";break;
+  default:comfortStatus = "Unknown:";break;
   };
 
   StaticJsonDocument<200> doc;
@@ -292,8 +264,7 @@ void sendData(String protocol)
   String requestData;
   serializeJson(doc, requestData);
 
-  if (protocol == "HTTP")
-  {
+  if (protocol == "HTTP"){
     HTTPClient http;
     String serverName = "http://10.134.178.158:8080/data";
     http.begin(serverName);
@@ -307,20 +278,17 @@ void sendData(String protocol)
 
     int httpResponseCode = http.POST(requestData);
 
-    if (httpResponseCode > 0)
-    {
+    if (httpResponseCode > 0){
       String response = http.getString();
       Serial.println("HTTP Response code: " + String(httpResponseCode));
       Serial.println("Server response: " + response);
     }
-    else
-    {
+    else{
       Serial.println("POST Request failed. Error: " + HTTPClient::errorToString(httpResponseCode));
     }
     http.end();
   }
-  else if (protocol == "MQTT")
-  {
+  else if (protocol == "MQTT"){
     mqttClient.setId("esp1");
     mqttClient.setUsernamePassword("admin", "initial01");
 
@@ -329,15 +297,13 @@ void sendData(String protocol)
 
     int retryCount = 0;
     const int maxRetries = 5;
-    while (!mqttClient.connect(broker, port) && retryCount < maxRetries)
-    {
+    while (!mqttClient.connect(broker, port) && retryCount < maxRetries){
       Serial.print("Retrying MQTT connection... Attempt: ");
       Serial.println(retryCount + 1);
       delay(1000);
       retryCount++;
     }
-    if (retryCount == maxRetries)
-    {
+    if (retryCount == maxRetries){
       Serial.println("Failed to connect to MQTT broker after multiple attempts.");
       return;
     }
@@ -349,8 +315,7 @@ void sendData(String protocol)
 
     unsigned long currentMillis = millis();
 
-    if (currentMillis - previousMillis >= interval)
-    {
+    if (currentMillis - previousMillis >= interval){
       previousMillis = currentMillis;
 
       Serial.print("Sending message to topic: ");
@@ -366,14 +331,12 @@ void sendData(String protocol)
       count++;
     }
   }
-  else
-  {
+  else{
     Serial.println("Unsupported protocol specified.");
   }
 }
 
-void setup()
-{
+void setup(){
   Serial.begin(115200);
   // Pin Configuration
   pinMode(trigPin1, OUTPUT);
@@ -382,24 +345,20 @@ void setup()
   pinMode(echoPin2, INPUT);
   pinMode(tiltpin, INPUT);
   pinMode(irSensorPin, INPUT);
-  if (WiFi.status() != WL_CONNECTED)
-  {
+  if (WiFi.status() != WL_CONNECTED){
     Serial.println("WiFi not connected. Trying to reconnect...");
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED)
-    {
+    while (WiFi.status() != WL_CONNECTED){
       delay(1000);
       Serial.println("Reconnecting...");
     }
     Serial.println("Reconnected to WiFi.");
   }
-
   // Sensor Setup for temperature
   dht.setup(DHTPIN, DHTesp::DHT11);
 
   initTemp();
   tasksEnabled = true;
-
   print_wakeup_reason();
 
   bootCount++;
@@ -407,8 +366,7 @@ void setup()
 
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, 1);
 
-  if (digitalRead(GPIO_NUM_4) == HIGH)
-  {
+  if (digitalRead(GPIO_NUM_4) == HIGH){
     Serial.println("Tilt detected. Measuring and sending data...");
     measureDistances();
     sendData("HTTP");
@@ -416,8 +374,7 @@ void setup()
     String dhtData = getDHTSensorData(dht);
     Serial.println(dhtData);
   }
-  else
-  {
+  else{
     Serial.println("No tilt detected. Going back to sleep...");
     measureDistances();
     sendData("HTTP");
@@ -430,32 +387,25 @@ void setup()
   delay(100);
 }
 
-void loop()
-{
+void loop(){
   measureDistances();
   sensorData = getDHTSensorData(dht);
   tiltState = digitalRead(tiltpin);
   sensorState = digitalRead(irSensorPin);
 
-  if (tiltState == HIGH)
-  {
+  if (tiltState == HIGH){
     tilted = true;
     wasteReceived = false;
 
     sendData("MQTT");
   }
-  else
-  {
+  else{
     tilted = false;
-    if (sensorState == LOW)
-    {
+    if (sensorState == LOW){
       Serial.println("Obstacle detected! Waste received.");
-
       wasteReceived = true;
-
       sendData("MQTT");
     }
   }
-
   delay(5000);
 }
